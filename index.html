@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f1ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1a22" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Feeds">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23c98b8b'/%3E%3Ctext x='90' y='120' font-size='90' text-anchor='middle'%3E%F0%9F%8D%BC%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Feed%20Tracker%22%2C%22short_name%22%3A%22Feeds%22%2C%22display%22%3A%22standalone%22%2C%22start_url%22%3A%22.%22%2C%22background_color%22%3A%22%231b1a22%22%2C%22theme_color%22%3A%22%23c98b8b%22%7D">
+<title>Feed Tracker</title>
+<style>
+:root{--bg:#f6f1ee;--card:#fff;--ink:#3b3440;--mute:#8a8090;--L:#c98b8b;--R:#7fa3b8;--acc:#8fae8b;--line:#e8e0dc}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1a22;--card:#26242f;--ink:#e9e3ea;--mute:#9a93a3;--L:#b77a7a;--R:#6b8ea3;--acc:#7a9a76;--line:#34313d}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font:17px/1.4 -apple-system,system-ui,sans-serif;background:var(--bg);color:var(--ink);padding:env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom))}
+h1{font-size:20px;font-weight:600;margin:16px 0 8px}
+.card{background:var(--card);border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 1px 3px #0001}
+.info{display:flex;justify-content:space-between;gap:8px}.info div{flex:1}.info b{display:block;font-size:22px}
+.mute{color:var(--mute);font-size:14px}
+button{font:inherit;border:0;border-radius:16px;min-height:56px;padding:0 16px;color:#fff;background:var(--acc);cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.big{width:100%;min-height:72px;font-size:20px;font-weight:600}
+.sides{display:flex;gap:12px;margin:12px 0}
+.side{flex:1;min-height:170px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:.75}
+.side.L{background:var(--L)}.side.R{background:var(--R)}
+.side.on{opacity:1;box-shadow:0 0 0 4px var(--ink) inset}
+.side .t{font-size:34px;font-variant-numeric:tabular-nums;font-weight:600}
+.side .s{font-size:14px}
+.total{text-align:center;font-size:18px;margin:4px 0 12px}
+.row{display:flex;gap:10px}.row button{flex:1}
+.day h2{font-size:15px;margin:18px 4px 6px;display:flex;justify-content:space-between}
+.entry{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line);min-height:56px}
+.entry .d{font-size:14px;color:var(--mute)}
+dialog{border:0;border-radius:20px;background:var(--card);color:var(--ink);width:min(92vw,420px)}
+dialog::backdrop{background:#0007}
+label{display:block;margin:10px 0 4px;font-size:14px;color:var(--mute)}
+input{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<h1>Breastfeeding</h1>
+<div class="card info">
+  <div><span class="mute">Since last feed</span><b id="since">—</b></div>
+  <div><span class="mute">Last side</span><b id="lastSide">—</b></div>
+  <div><span class="mute">Next</span><b id="nextSide">—</b></div>
+</div>
+
+<div id="idle"><button class="big" id="newBtn">+ New feed</button></div>
+<div id="session" class="card hidden">
+  <div class="sides">
+    <button class="side L" id="btnL"><span>LEFT</span><span class="t" id="tL">0:00</span><span class="s" id="sL">tap to start</span></button>
+    <button class="side R" id="btnR"><span>RIGHT</span><span class="t" id="tR">0:00</span><span class="s" id="sR">tap to start</span></button>
+  </div>
+  <div class="total">Total <b id="tT">0:00</b></div>
+  <div class="row"><button class="ghost" id="cancelBtn">Discard</button><button id="stopBtn">Finish &amp; save</button></div>
+</div>
+
+<div class="row" style="margin-top:8px">
+  <button class="ghost" id="manualBtn">Add manual</button>
+  <button class="ghost" id="exportBtn">Export CSV</button>
+  <button class="ghost" id="importBtn">Import CSV</button>
+</div>
+<input type="file" id="file" accept=".csv,text/csv" class="hidden">
+<div id="history"></div>
+
+<dialog id="dlg"><form method="dialog" id="form">
+  <h3 id="dlgTitle" style="margin-top:0">Edit feed</h3>
+  <label>Start</label><input type="datetime-local" id="fStart" required>
+  <label>Left (minutes)</label><input type="number" id="fL" min="0" step="0.5" inputmode="decimal">
+  <label>Right (minutes)</label><input type="number" id="fR" min="0" step="0.5" inputmode="decimal">
+  <div class="row" style="margin-top:16px">
+    <button type="button" class="ghost" id="delBtn" style="color:#c55">Delete</button>
+    <button type="button" class="ghost" id="closeBtn">Cancel</button>
+    <button type="submit" value="save">Save</button>
+  </div>
+</form></dialog>
+
+<script>
+(function(){
+const KEY='feedTracker.v1';
+const $=id=>document.getElementById(id);
+let S=load();
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.feeds))return s}catch(e){}return{feeds:[],active:null}}
+function save(){localStorage.setItem(KEY,JSON.stringify(S))}
+const now=()=>Date.now();
+// active: {start, segs:[{side,from,to|null}]}
+function sideMs(a,side,t){t=t||now();return a.segs.filter(g=>g.side===side).reduce((m,g)=>m+((g.to??t)-g.from),0)}
+function running(a){const g=a&&a.segs[a.segs.length-1];return g&&g.to==null?g.side:null}
+function pauseAll(a,t){const g=a.segs[a.segs.length-1];if(g&&g.to==null)g.to=t}
+const api={
+  newFeed(){if(!S.active){S.active={start:null,segs:[]};save()}render()},
+  tap(side){const a=S.active;if(!a)return;const t=now();const r=running(a);pauseAll(a,t);
+    if(r!==side){if(!a.start)a.start=t;a.segs.push({side,from:t,to:null})}save();render()},
+  finish(){const a=S.active;if(!a)return;const t=now();pauseAll(a,t);
+    const L=sideMs(a,'L',t),R=sideMs(a,'R',t);
+    if(a.start&&L+R>0){const last=a.segs[a.segs.length-1].side;S.feeds.push({id:t.toString(36)+Math.random().toString(36).slice(2,6),start:a.start,L,R,last})}
+    S.active=null;save();render()},
+  discard(){if(S.active&&(!S.active.segs.length||confirm('Discard this feed?'))){S.active=null;save();render()}},
+  state:()=>S, reload(){S=load();render()}
+};
+window.FeedTracker=api;
+
+function fmt(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`:`${m}:${String(x).padStart(2,'0')}`}
+const mins=ms=>Math.round(ms/60000);
+function ago(ms){const m=Math.floor(ms/60000);return m<60?m+'m':Math.floor(m/60)+'h '+(m%60)+'m'}
+const sideName=s=>s==='L'?'Left':s==='R'?'Right':'—';
+const sorted=()=>S.feeds.slice().sort((a,b)=>b.start-a.start);
+
+function renderTop(){
+  const a=S.active,t=now();
+  $('idle').classList.toggle('hidden',!!a);$('session').classList.toggle('hidden',!a);
+  const f=sorted()[0];
+  const lastStart=a&&a.start?a.start:f&&f.start;
+  $('since').textContent=lastStart?ago(t-lastStart):'—';
+  const last=(a&&a.segs.length)?a.segs[a.segs.length-1].side:f&&f.last;
+  $('lastSide').textContent=sideName(last);
+  $('nextSide').textContent=last?sideName(last==='L'?'R':'L'):'—';
+  if(a){const r=running(a);for(const s of['L','R']){$('t'+s).textContent=fmt(sideMs(a,s,t));
+    $('btn'+s).classList.toggle('on',r===s);$('s'+s).textContent=r===s?'tap to pause':sideMs(a,s,t)?'paused':'tap to start'}
+    $('tT').textContent=fmt(sideMs(a,'L',t)+sideMs(a,'R',t))}
+}
+function renderHistory(){
+  const h=$('history');h.innerHTML='';const days={};
+  for(const f of sorted()){const k=new Date(f.start).toDateString();(days[k]=days[k]||[]).push(f)}
+  for(const k in days){const list=days[k];const tot=list.reduce((m,f)=>m+f.L+f.R,0);
+    const d=document.createElement('div');d.className='day';
+    d.innerHTML=`<h2><span>${k}</span><span class="mute">${list.length} feed${list.length===1?"":"s"} · ${mins(tot)} min</span></h2>`;
+    for(const f of list){const e=document.createElement('div');e.className='entry card';e.style.margin='6px 0';
+      e.innerHTML=`<div><b>${new Date(f.start).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</b><div class="d">L ${fmt(f.L)} · R ${fmt(f.R)}</div></div><div><b>${fmt(f.L+f.R)}</b></div>`;
+      e.onclick=()=>openDlg(f);d.appendChild(e)}
+    h.appendChild(d)}
+  if(!S.feeds.length)h.innerHTML='<p class="mute" style="text-align:center;margin-top:24px">No feeds yet</p>';
+}
+function render(){renderTop();renderHistory()}
+
+let editing=null;
+function toLocal(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function openDlg(f){editing=f;$('dlgTitle').textContent=f?'Edit feed':'Add feed';$('delBtn').classList.toggle('hidden',!f);
+  $('fStart').value=toLocal(f?f.start:now());$('fL').value=f?+(f.L/60000).toFixed(1):'';$('fR').value=f?+(f.R/60000).toFixed(1):'';
+  $('dlg').showModal?$('dlg').showModal():$('dlg').setAttribute('open','')}
+$('form').onsubmit=e=>{const start=new Date($('fStart').value).getTime();if(isNaN(start))return;
+  const L=Math.round((+$('fL').value||0)*60000),R=Math.round((+$('fR').value||0)*60000);
+  if(editing)Object.assign(editing,{start,L,R});else S.feeds.push({id:now().toString(36),start,L,R,last:R&&!L?'R':L&&!R?'L':'R'});
+  save();render()};
+$('closeBtn').onclick=()=>$('dlg').close();
+$('delBtn').onclick=()=>{if(editing&&confirm('Delete this feed?')){S.feeds=S.feeds.filter(f=>f!==editing);save();render();$('dlg').close()}};
+
+function toCSV(){return 'start_iso,left_seconds,right_seconds,last_side\n'+sorted().map(f=>[new Date(f.start).toISOString(),Math.round(f.L/1000),Math.round(f.R/1000),f.last||''].join(',')).join('\n')}
+function fromCSV(txt){let n=0;const seen=new Set(S.feeds.map(f=>f.start));
+  for(const line of txt.trim().split(/\r?\n/).slice(1)){const[s,l,r,last]=line.split(',');const start=Date.parse(s);
+    if(isNaN(start)||seen.has(start))continue;S.feeds.push({id:start.toString(36),start,L:(+l||0)*1000,R:(+r||0)*1000,last:last||''});seen.add(start);n++}
+  save();render();return n}
+api.toCSV=toCSV;api.fromCSV=fromCSV;
+$('exportBtn').onclick=()=>{const b=new Blob([toCSV()],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='feeds-'+new Date().toISOString().slice(0,10)+'.csv';a.click()};
+$('importBtn').onclick=()=>$('file').click();
+$('file').onchange=async e=>{const f=e.target.files[0];if(f){alert('Imported '+fromCSV(await f.text())+' feeds');e.target.value=''}};
+$('newBtn').onclick=api.newFeed;$('btnL').onclick=()=>api.tap('L');$('btnR').onclick=()=>api.tap('R');
+$('stopBtn').onclick=api.finish;$('cancelBtn').onclick=api.discard;$('manualBtn').onclick=()=>openDlg(null);
+document.addEventListener('visibilitychange',render);window.addEventListener('storage',api.reload);
+setInterval(renderTop,1000);render();
+})();
+</script>
+</body>
+</html>
