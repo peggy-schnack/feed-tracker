@@ -71,8 +71,8 @@ input{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid v
 <dialog id="dlg"><form method="dialog" id="form">
   <h3 id="dlgTitle" style="margin-top:0">Edit feed</h3>
   <label>Start</label><input type="datetime-local" id="fStart" required>
-  <label>Left (minutes)</label><input type="number" id="fL" min="0" step="0.5" inputmode="decimal">
-  <label>Right (minutes)</label><input type="number" id="fR" min="0" step="0.5" inputmode="decimal">
+  <label>Left (min : sec)</label><div class="row"><input type="number" id="fLm" min="0" step="1" inputmode="numeric" placeholder="min"><input type="number" id="fLs" min="0" max="59" step="1" inputmode="numeric" placeholder="sec"></div>
+  <label>Right (min : sec)</label><div class="row"><input type="number" id="fRm" min="0" step="1" inputmode="numeric" placeholder="min"><input type="number" id="fRs" min="0" max="59" step="1" inputmode="numeric" placeholder="sec"></div>
   <div class="row" style="margin-top:16px">
     <button type="button" class="ghost" id="delBtn" style="color:#c55">Delete</button>
     <button type="button" class="ghost" id="closeBtn">Cancel</button>
@@ -141,10 +141,10 @@ function render(){renderTop();renderHistory()}
 let editing=null;
 function toLocal(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
 function openDlg(f){editing=f;$('dlgTitle').textContent=f?'Edit feed':'Add feed';$('delBtn').classList.toggle('hidden',!f);
-  $('fStart').value=toLocal(f?f.start:now());$('fL').value=f?+(f.L/60000).toFixed(1):'';$('fR').value=f?+(f.R/60000).toFixed(1):'';
+  $('fStart').value=toLocal(f?f.start:now());for(const k of['L','R']){const sec=f?Math.round(f[k]/1000):0;$('f'+k+'m').value=f?Math.floor(sec/60):'';$('f'+k+'s').value=f?sec%60:''}
   $('dlg').showModal?$('dlg').showModal():$('dlg').setAttribute('open','')}
 $('form').onsubmit=e=>{const start=new Date($('fStart').value).getTime();if(isNaN(start))return;
-  const L=Math.round((+$('fL').value||0)*60000),R=Math.round((+$('fR').value||0)*60000);
+  const rd=k=>(Math.max(0,Math.floor(+$('f'+k+'m').value||0))*60+Math.max(0,Math.floor(+$('f'+k+'s').value||0)))*1000;const L=rd('L'),R=rd('R');
   if(editing)Object.assign(editing,{start,L,R});else S.feeds.push({id:now().toString(36),start,L,R,last:R&&!L?'R':L&&!R?'L':'R'});
   save();render()};
 $('closeBtn').onclick=()=>$('dlg').close();
